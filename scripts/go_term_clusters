@@ -1,0 +1,18 @@
+
+res <- read.csv("results/Mfuzz/genes_in_9clusters.csv")
+
+res <- res[which(res[,"adj.P.Val"]<=1e-04),]
+
+res9 <- res[which(res[,"closest"]=="9"),]
+
+library(beadarray)
+library(biomaRt)
+
+ensmart<- useMart("ensembl",dataset="mmusculus_gene_ensembl")
+
+results<- getBM(filters="ensembl_gene_id", values=res9[,"EnsemblID"], attributes=c("ensembl_gene_id", "go_biological_process_id"), mart=ensmart)
+
+
+results.go<- unique(results[results[,2]=="GO:0045449","ensembl_gene_id"])
+
+res9[which(res9[,"EnsemblID"]%in%results.go),"symbol"]

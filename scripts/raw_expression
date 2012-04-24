@@ -1,0 +1,149 @@
+
+###########take raw expression data from BSData and link back to histone calls data and then compare actual gene expression levels to histone calls
+
+library(beadarray)
+library(limma)
+library(biomaRt)
+library(illuminaMousev2BeadID.db)
+library(illuminaMousev2.db) 
+
+BSData <- get(load("data/BSData.quantile.RData"))
+E <- exprs(BSData)
+
+####add Ensembl IDs to E as something wierd is happening....
+
+ids = rownames(E)
+
+symbol <- mget(ids, illuminaMousev2SYMBOL, ifnotfound = NA)
+sum(sapply(symbol, length) > 1)
+symbol <- as.character(symbol)
+length(which(symbol=="NA"))
+
+ensembl = mget(ids, illuminaMousev2ENSEMBL, ifnotfound = NA)
+length(which(is.na(ensembl)))
+
+sum(sapply(ensembl, length) > 1)
+crosshyb <- which(( sapply(ensembl, length) ) > 1) 
+length(crosshyb)
+ensembl[crosshyb] <- NA 
+ensembl <- as.character(ensembl)
+ensembl[ensembl=="NA"] = NA
+length(which(is.na(ensembl)))
+
+##########make averages for different ages - use apply function
+
+e11.cols <- c(1,2)
+e14.cols <- c(3,4,5,6)
+p1.cols <- c(7,8)
+
+aves <- apply(E, 1, function(x){  
+    E11.ave  <- sum(x[e11.cols])/length(e11.cols)
+    E14.ave   <- sum(x[e14.cols])/length(e14.cols)
+    P1.ave   <- sum(x[p1.cols])/length(p1.cols)
+    return(c(E11.ave, E14.ave, P1.ave))
+ }
+)
+
+aves <- t(aves)
+colnames(aves)<-c("E11.5.ave", "E14.5.ave", "P1.ave")
+
+###add back to E to give ensembl ids and raw expression values
+
+anno <- data.frame(
+                   ID = as.character(ids),
+                   EnsemblID = ensembl,
+                   symbol=symbol,
+                   aves[,1:3],
+                   stringsAsFactors=F
+              )
+
+anno <- anno[,2:6]
+
+write.csv(anno, "raw_probe_expression_annotated.csv")
+
+#####split up
+#take genes that are not expressed at E11.5 or E14.5 but become expressed at P1 (and are signifcantly upregulated ie logFC>1)
+e11.ne <- which(anno[,"E11.5.ave"]<8)
+e14.ne <- which(anno[,"E14.5.ave"]<8)
+p1.ex <- which(anno[,"P1.ave"]>=8)
+
+up_p1 <- intersect(intersect(e11.ne,e14.ne),p1.ex)
+
+up_in_p1 <- rownames(up_p1)
+
+res <- read.csv("results/f_test.csv")
+
+rownames(res) <- res[,"ID"]
+
+p1 <- res[up_in_p1,]
+
+up_p1 <- p1[which(p1[,"E14.5vP1"]>=1),]
+
+up_p1.ids <- rownames(up_p1)
+
+
+## up_p1 represents genes that are not expressed at E11.5 or E14.5 and are only significantly expressed at P1
+## if take genes that are only downregulated at E14.5 to P1 then combine them and stick them in ingenuity?
+#take genes that are expressed at both E11.5 and E14.5 but are downregulated only at P1
+
+e11.e <- which(anno[,"E11.5.ave"]>8)
+e14.e <- which(anno[,"E14.5.ave"]>8)
+
+e11_14.e <- intersect(e11.e,e14.e)
+
+e11_14.e <- anno[e11_14.e,]
+
+e11_14.e.ids <- rownames(e11_14.e)
+
+#these are genes that are expressed at E11.5 and E14.5, but check that their expression doesnt change much
+
+e11_14.same <- which(abs(res[,"E11.5vE14.5"])<=1)
+
+e11_14.same <- res[e11_14.same,]
+
+e11_14.same <- rownames(e11_14.same)
+
+e11_14.e.same <- intersect(e11_14.e.ids,e11_14.same)
+
+##this is now the genes that are expressed, but stay at the same level between E11.5 and E14.5, but do they change at P1?
+
+p1.down <- which(res[,"E14.5vP1"]<=-1)
+
+p1.down <- res[p1.down,]
+
+p1.down.ids <- rownames(p1.down)
+
+
+##now intersect them together...
+
+samedown <- intersect(e11_14.e.same,p1.down.ids)
+
+samedown <- res[samedown,]
+
+samedown.ids <- rownames(samedown)
+
+########and now combine with genes that are only upregulated at P1 to give genes that only change expression at E14.5 to P1...
+
+all.p1.ids <- c(up_p1.ids,samedown.ids)
+
+all_p1_changing <- res[all.p1.ids,]
+
+all_p1_changing <- all_p1_changing[,c(2,3,5,6,7,8,9,10,12,16)]
+
+all_p1_changing <- all_p1_changing[which(all_p1_changing[,"adj.P.Val"]<=0.05),]
+
+write.csv(all_p1_changing,"results/all_p1_changing.csv")
+
+
+
+
+
+
+
+
+
+
+
+
+
+

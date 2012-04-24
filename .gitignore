@@ -1,0 +1,12 @@
+﻿*results/*
+*data/*
+*#
+*.swp
+*.swo
+*~
+*nohup.out*
+*htaccess*
+*tar.gz
+*.csv
+*.ps
+*.RData
