@@ -1,0 +1,3 @@
+Illumina microarray data from in vivo GABAergic neuronal lineage. FACS purified MGE progenitors at E11.5 (based on CD15/Nkx2.1) expression, immature migrating interneurons at E14.5 (Lhx6YFP) and mature cortical GABAergic interneurons at P1 (Lhx6YFP). 
+
+Data analysed as a time course using fuzzy c-means and as a straight comparison at each age.
